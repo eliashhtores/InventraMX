@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>InventraMX · WMS</title>
+  <link rel="icon" href="data:,">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="bg-slate-100 text-slate-800 min-h-screen">
+  <header class="bg-slate-900 text-white">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center gap-4">
+      <h1 class="text-xl font-semibold">Inventra<span class="text-emerald-400">MX</span></h1>
+      <nav id="nav" class="flex flex-wrap gap-1 text-sm">
+        <a href="#dashboard" data-view="dashboard" class="nav-link">Dashboard</a>
+        <a href="#products" data-view="products" class="nav-link">Products</a>
+        <a href="#warehouses" data-view="warehouses" class="nav-link">Warehouses</a>
+        <a href="#locations" data-view="locations" class="nav-link">Locations</a>
+        <a href="#stock" data-view="stock" class="nav-link">Stock</a>
+        <a href="#movements" data-view="movements" class="nav-link">Movements</a>
+      </nav>
+      <span id="api-status" class="ml-auto text-xs text-slate-400">API: checking…</span>
+    </div>
+  </header>
+
+  <div id="toast" aria-hidden="true" class="hidden fixed top-4 right-4 z-50 px-4 py-2 rounded shadow text-sm text-white"></div>
+  <div id="sr-status" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
+  <div id="sr-alert" class="sr-only" role="alert" aria-live="assertive" aria-atomic="true"></div>
+
+  <main class="max-w-7xl mx-auto px-4 py-6 space-y-6">
+    <!-- Dashboard -->
+    <section id="view-dashboard" class="view">
+      <div id="summary-cards" class="grid grid-cols-2 md:grid-cols-4 gap-4"></div>
+      <div class="grid md:grid-cols-2 gap-6 mt-6">
+        <div class="card">
+          <h2 class="card-title">Movements by type</h2>
+          <ul id="summary-movements" class="text-sm space-y-1"></ul>
+        </div>
+        <div class="card">
+          <h2 class="card-title">Low stock (at or below reorder level)</h2>
+          <table class="table"><thead><tr><th>SKU</th><th>Name</th><th class="text-right">On hand</th><th class="text-right">Reorder</th></tr></thead>
+            <tbody id="low-stock-body"></tbody></table>
+        </div>
+      </div>
+    </section>
+
+    <!-- Products -->
+    <section id="view-products" class="view hidden">
+      <form id="product-form" class="card grid md:grid-cols-6 gap-3 items-end">
+        <h2 class="card-title md:col-span-6">New product</h2>
+        <label class="field">SKU<input name="sku" required maxlength="64"></label>
+        <label class="field md:col-span-2">Name<input name="name" required maxlength="200"></label>
+        <label class="field">Unit<input name="unit" value="pcs" maxlength="20"></label>
+        <label class="field">Reorder level<input name="reorder_level" type="number" min="0" value="0"></label>
+        <button class="btn">Add product</button>
+      </form>
+      <div class="card mt-6">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="card-title mb-0">Products</h2>
+          <input id="product-search" type="search" placeholder="Search SKU or name…" class="input w-64">
+        </div>
+        <table class="table"><thead><tr><th>SKU</th><th>Name</th><th>Unit</th><th class="text-right">On hand</th><th class="text-right">Reorder</th><th>Active</th><th></th></tr></thead>
+          <tbody id="products-body"></tbody></table>
+      </div>
+    </section>
+
+    <!-- Warehouses -->
+    <section id="view-warehouses" class="view hidden">
+      <form id="warehouse-form" class="card grid md:grid-cols-5 gap-3 items-end">
+        <h2 class="card-title md:col-span-5">New warehouse</h2>
+        <label class="field">Code<input name="code" required maxlength="20"></label>
+        <label class="field">Name<input name="name" required maxlength="120"></label>
+        <label class="field md:col-span-2">Address<input name="address" maxlength="255"></label>
+        <button class="btn">Add warehouse</button>
+      </form>
+      <div class="card mt-6">
+        <h2 class="card-title">Warehouses</h2>
+        <table class="table"><thead><tr><th>Code</th><th>Name</th><th>Address</th><th>Active</th><th></th></tr></thead>
+          <tbody id="warehouses-body"></tbody></table>
+      </div>
+    </section>
+
+    <!-- Locations -->
+    <section id="view-locations" class="view hidden">
+      <form id="location-form" class="card grid md:grid-cols-4 gap-3 items-end">
+        <h2 class="card-title md:col-span-4">New location</h2>
+        <label class="field">Warehouse<select name="warehouse" required data-options="activeWarehouses"></select></label>
+        <label class="field">Code<input name="code" required maxlength="40" placeholder="A-01-01"></label>
+        <label class="field">Type
+          <select name="location_type">
+            <option value="storage">Storage</option>
+            <option value="receiving">Receiving</option>
+            <option value="picking">Picking</option>
+            <option value="shipping">Shipping</option>
+          </select>
+        </label>
+        <button class="btn">Add location</button>
+      </form>
+      <div class="card mt-6">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="card-title mb-0">Locations</h2>
+          <select id="location-filter" class="input w-64" data-options="warehouses" data-empty="All warehouses"></select>
+        </div>
+        <table class="table"><thead><tr><th>Warehouse</th><th>Code</th><th>Type</th><th>Active</th><th></th></tr></thead>
+          <tbody id="locations-body"></tbody></table>
+      </div>
+    </section>
+
+    <!-- Stock -->
+    <section id="view-stock" class="view hidden">
+      <div class="card">
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+          <h2 class="card-title mb-0">Stock on hand</h2>
+          <div class="flex gap-2">
+            <select id="stock-warehouse" class="input w-48" data-options="warehouses" data-empty="All warehouses"></select>
+            <input id="stock-search" type="search" placeholder="Search SKU, name, location…" class="input w-64">
+          </div>
+        </div>
+        <table class="table"><thead><tr><th>SKU</th><th>Product</th><th>Warehouse</th><th>Location</th><th class="text-right">Quantity</th><th>Updated</th></tr></thead>
+          <tbody id="stock-body"></tbody></table>
+      </div>
+    </section>
+
+    <!-- Movements -->
+    <section id="view-movements" class="view hidden">
+      <form id="movement-form" class="card grid md:grid-cols-6 gap-3 items-end">
+        <h2 class="card-title md:col-span-6">Record movement</h2>
+        <label class="field">Type
+          <select name="movement_type" id="movement-type">
+            <option value="inbound">Inbound (receive)</option>
+            <option value="outbound">Outbound (pick / ship)</option>
+            <option value="transfer">Transfer</option>
+            <option value="adjustment">Adjustment</option>
+          </select>
+        </label>
+        <label class="field">Product<select name="product" required data-options="products"></select></label>
+        <label class="field" data-for="from">From location<select name="from_location" data-options="locations" data-empty="—"></select></label>
+        <label class="field" data-for="to">To location<select name="to_location" data-options="locations" data-empty="—"></select></label>
+        <label class="field">Quantity<input name="quantity" type="number" min="1" value="1" required></label>
+        <label class="field">Reference<input name="reference" maxlength="100" placeholder="PO / SO #"></label>
+        <p id="movement-hint" class="text-xs text-slate-500 md:col-span-5"></p>
+        <button class="btn">Record</button>
+      </form>
+      <div class="card mt-6">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="card-title mb-0">Movement history</h2>
+          <select id="movement-filter" class="input w-48">
+            <option value="">All types</option>
+            <option value="inbound">Inbound</option>
+            <option value="outbound">Outbound</option>
+            <option value="transfer">Transfer</option>
+            <option value="adjustment">Adjustment</option>
+          </select>
+        </div>
+        <table class="table"><thead><tr><th>Date</th><th>Type</th><th>SKU</th><th>From</th><th>To</th><th class="text-right">Qty</th><th>Reference</th></tr></thead>
+          <tbody id="movements-body"></tbody></table>
+      </div>
+    </section>
+  </main>
+
+  <script src="js/api.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
