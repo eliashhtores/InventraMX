@@ -1,0 +1,31 @@
+/* Small set of reusable component classes on top of Tailwind utilities. */
+.hidden { display: none !important; } /* fallback if the Tailwind CDN is unavailable */
+.nav-link { padding: 0.375rem 0.75rem; border-radius: 0.375rem; color: #cbd5e1; }
+.nav-link:hover { background: #1e293b; color: #fff; }
+.nav-link.active { background: #059669; color: #fff; }
+
+.card { background: #fff; border-radius: 0.5rem; padding: 1rem; box-shadow: 0 1px 2px rgb(0 0 0 / 0.08); }
+.card-title { font-weight: 600; font-size: 1rem; margin-bottom: 0.75rem; }
+
+.field { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.75rem; color: #475569; }
+.field input, .field select, .input {
+  border: 1px solid #cbd5e1; border-radius: 0.375rem; padding: 0.4rem 0.6rem;
+  font-size: 0.875rem; color: #1e293b; background: #fff;
+}
+.field input:focus, .field select:focus, .input:focus { outline: 2px solid #10b981; outline-offset: -1px; }
+
+.btn { background: #059669; color: #fff; border-radius: 0.375rem; padding: 0.5rem 0.9rem; font-size: 0.875rem; font-weight: 500; }
+.btn:hover { background: #047857; }
+.btn-link { color: #64748b; font-size: 0.75rem; text-decoration: underline; }
+.btn-link:hover { color: #0f172a; }
+
+.table { width: 100%; font-size: 0.875rem; border-collapse: collapse; }
+.table th { text-align: left; font-weight: 600; color: #475569; border-bottom: 1px solid #e2e8f0; padding: 0.5rem; }
+.table td { border-bottom: 1px solid #f1f5f9; padding: 0.5rem; }
+.table th.text-right, .table td.text-right { text-align: right; }
+
+.badge { display: inline-block; padding: 0.1rem 0.5rem; border-radius: 9999px; font-size: 0.7rem; font-weight: 600; }
+.badge-inbound { background: #d1fae5; color: #065f46; }
+.badge-outbound { background: #fee2e2; color: #991b1b; }
+.badge-transfer { background: #dbeafe; color: #1e40af; }
+.badge-adjustment { background: #fef3c7; color: #92400e; }
