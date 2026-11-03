@@ -45,6 +45,8 @@
   function toast(message, isError) {
     var box = $('#toast');
     box.textContent = message;
+    box.setAttribute('role', isError ? 'alert' : 'status');
+    box.setAttribute('aria-live', isError ? 'assertive' : 'polite');
     box.className = 'fixed top-4 right-4 z-50 px-4 py-2 rounded shadow text-sm text-white ' + (isError ? 'bg-red-600' : 'bg-emerald-600');
     clearTimeout(toastTimer);
     toastTimer = setTimeout(function () { box.classList.add('hidden'); }, isError ? 6000 : 3000);
@@ -150,7 +152,12 @@
       fetchAll('/products/', { is_active: 'true' })
     ]).then(function (lists) {
       cache.warehouses = lists[0];
-      cache.locations = lists[1];
+      var activeWarehouseIds = cache.warehouses.filter(function (warehouse) {
+        return warehouse.is_active;
+      }).map(function (warehouse) { return String(warehouse.id); });
+      cache.locations = lists[1].filter(function (location) {
+        return activeWarehouseIds.indexOf(String(location.warehouse)) !== -1;
+      });
       cache.products = lists[2];
       $all('select[data-options]').forEach(fillSelect);
     });
@@ -297,8 +304,13 @@
 
   function bindCreateForm(formId, path, successMessage) {
     var form = $(formId);
+    var submitButton = form.querySelector('button:not([type]), button[type="submit"], input[type="submit"]');
+    var submitting = false;
     form.addEventListener('submit', function (event) {
       event.preventDefault();
+      if (submitting) return;
+      submitting = true;
+      if (submitButton) submitButton.disabled = true;
       Api.post(path, formToJson(form))
         .then(function () {
           toast(successMessage);
@@ -307,7 +319,11 @@
         })
         .then(loadCurrent)
         .then(updateMovementForm)
-        .catch(showError);
+        .catch(showError)
+        .finally(function () {
+          submitting = false;
+          if (submitButton) submitButton.disabled = false;
+        });
     });
   }
 

@@ -18,6 +18,13 @@ class LocationSerializer(serializers.ModelSerializer):
         model = Location
         fields = ["id", "warehouse", "warehouse_code", "code", "location_type", "is_active"]
 
+    def validate(self, attrs):
+        if self.instance and attrs.get("warehouse", self.instance.warehouse) != self.instance.warehouse:
+            raise serializers.ValidationError(
+                {"warehouse": "Warehouse cannot be changed after location creation."}
+            )
+        return attrs
+
 
 class ProductSerializer(serializers.ModelSerializer):
     total_quantity = serializers.SerializerMethodField()
@@ -121,8 +128,11 @@ class StockMovementSerializer(serializers.ModelSerializer):
         if not attrs["product"].is_active:
             errors["product"] = "Product is inactive."
         for field, location in (("from_location", source), ("to_location", target)):
-            if location and not location.is_active and field not in errors:
-                errors[field] = "Location is inactive."
+            if location and field not in errors:
+                if not location.is_active:
+                    errors[field] = "Location is inactive."
+                elif not location.warehouse.is_active:
+                    errors[field] = "Warehouse is inactive."
 
         if errors:
             raise serializers.ValidationError(errors)

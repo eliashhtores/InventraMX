@@ -47,6 +47,16 @@ class CrudTests(ApiTestCase):
         self.assertEqual([loc["code"] for loc in response.json()["results"]], ["B-01"])
         self.assertEqual(self.client.get("/api/locations/?warehouse=abc").status_code, 400)
 
+    def test_location_warehouse_cannot_be_changed(self):
+        other = Warehouse.objects.create(code="MX2", name="Other")
+        self.move(movement_type="inbound", to_location=self.storage.id, quantity=1)
+        response = self.client.patch(
+            f"/api/locations/{self.storage.id}/", {"warehouse": other.id}, format="json"
+        )
+        self.assertEqual(response.status_code, 400)
+        self.storage.refresh_from_db()
+        self.assertEqual(self.storage.warehouse, self.warehouse)
+
     def test_invalid_choice_filters_rejected(self):
         self.assertEqual(self.client.get("/api/locations/?location_type=xyz").status_code, 400)
         self.assertEqual(self.client.get("/api/movements/?movement_type=xyz").status_code, 400)
@@ -110,6 +120,21 @@ class MovementTests(ApiTestCase):
             400,
         )
         self.assertEqual(self.move(movement_type="inbound", to_location=self.storage.id, quantity=0).status_code, 400)
+
+    def test_movements_reject_inactive_warehouses(self):
+        self.move(movement_type="inbound", to_location=self.storage.id, quantity=3)
+        self.warehouse.is_active = False
+        self.warehouse.save(update_fields=["is_active"])
+
+        inbound = self.move(movement_type="inbound", to_location=self.storage.id, quantity=1)
+        self.assertEqual(inbound.status_code, 400)
+        self.assertEqual(inbound.json()["to_location"], ["Warehouse is inactive."])
+
+        outbound = self.move(movement_type="outbound", from_location=self.storage.id, quantity=1)
+        self.assertEqual(outbound.status_code, 400)
+        self.assertEqual(outbound.json()["from_location"], ["Warehouse is inactive."])
+        self.assertEqual(self.qty(self.storage), 3)
+        self.assertEqual(StockMovement.objects.count(), 1)
 
     def test_movements_are_immutable(self):
         movement_id = self.move(movement_type="inbound", to_location=self.storage.id, quantity=1).json()["id"]

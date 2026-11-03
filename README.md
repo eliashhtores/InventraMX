@@ -24,7 +24,7 @@ The `web` container serves the REST API under `/api/` and the static frontend fr
 ## Quick start
 
 ```bash
-cp .env.example .env        # optional — sensible defaults are built in
+cp .env.example .env         # set POSTGRES_PASSWORD before starting
 docker compose up --build
 ```
 
@@ -44,7 +44,7 @@ container (`docker compose restart web`) after changing the frontend.
 | `DJANGO_ALLOWED_HOSTS`   | `localhost,127.0.0.1,0.0.0.0`   | Comma-separated host names.                  |
 | `POSTGRES_DB`            | `inventramx`                    | Database name.                               |
 | `POSTGRES_USER`          | `inventramx`                    | Database user.                               |
-| `POSTGRES_PASSWORD`      | `inventramx`                    | Database password.                           |
+| `POSTGRES_PASSWORD`      | required                        | Database password; set in `.env`.            |
 | `POSTGRES_HOST` / `PORT` | `db` / `5432`                   | Database host/port (set by Compose).         |
 | `WEB_PORT`               | `8000`                          | Host port published on `127.0.0.1`.          |
 
