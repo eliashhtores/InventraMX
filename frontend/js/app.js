@@ -42,14 +42,22 @@
   }
 
   var toastTimer;
+  var announcementTimer;
   function toast(message, isError) {
     var box = $('#toast');
     box.textContent = message;
-    box.setAttribute('role', isError ? 'alert' : 'status');
-    box.setAttribute('aria-live', isError ? 'assertive' : 'polite');
     box.className = 'fixed top-4 right-4 z-50 px-4 py-2 rounded shadow text-sm text-white ' + (isError ? 'bg-red-600' : 'bg-emerald-600');
+    var status = $('#sr-status');
+    var alert = $('#sr-alert');
+    status.textContent = '';
+    alert.textContent = '';
+    clearTimeout(announcementTimer);
+    announcementTimer = setTimeout(function () {
+      (isError ? alert : status).textContent = message;
+    }, 50);
     clearTimeout(toastTimer);
     toastTimer = setTimeout(function () { box.classList.add('hidden'); }, isError ? 6000 : 3000);
+    box.classList.remove('hidden');
   }
 
   function showError(err) { toast(err.message || String(err), true); }
@@ -141,6 +149,7 @@
 
   var LABELS = {
     warehouses: function (w) { return w.code + ' - ' + w.name; },
+    activeWarehouses: function (w) { return w.code + ' - ' + w.name; },
     locations: function (l) { return l.warehouse_code + '/' + l.code + ' (' + l.location_type + ')'; },
     products: function (p) { return p.sku + ' - ' + p.name; }
   };
@@ -155,6 +164,9 @@
       var activeWarehouseIds = cache.warehouses.filter(function (warehouse) {
         return warehouse.is_active;
       }).map(function (warehouse) { return String(warehouse.id); });
+      cache.activeWarehouses = cache.warehouses.filter(function (warehouse) {
+        return warehouse.is_active;
+      });
       cache.locations = lists[1].filter(function (location) {
         return activeWarehouseIds.indexOf(String(location.warehouse)) !== -1;
       });

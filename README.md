@@ -30,6 +30,11 @@ docker compose up --build
 
 Open http://localhost:8000. Migrations are applied automatically when the `web` container starts.
 
+PostgreSQL applies `POSTGRES_PASSWORD` only when its data volume is initialized. If you change the
+password in `.env` while reusing an existing `postgres_data` volume, keep the old password so the
+web service can connect, or recreate the database with `docker compose down -v` (this deletes all
+database data) before starting again.
+
 The `frontend/` directory is bind-mounted into the container, so edits to HTML/CSS/JS are visible
 after a browser refresh. This relies on WhiteNoise autorefresh, which is only enabled when
 `DJANGO_DEBUG=1`; with `DJANGO_DEBUG=0`, files are indexed once at startup, so restart the `web`
