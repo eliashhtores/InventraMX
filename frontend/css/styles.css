@@ -29,3 +29,6 @@
 .badge-outbound { background: #fee2e2; color: #991b1b; }
 .badge-transfer { background: #dbeafe; color: #1e40af; }
 .badge-adjustment { background: #fef3c7; color: #92400e; }
+
+.pager { display: flex; justify-content: space-between; align-items: center; margin-top: 0.75rem; font-size: 0.75rem; color: #64748b; }
+.btn-link:disabled { color: #cbd5e1; text-decoration: none; cursor: default; }

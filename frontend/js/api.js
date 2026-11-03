@@ -21,7 +21,12 @@
     if (typeof data === 'string') return data;
     if (data.detail) return data.detail;
     return Object.keys(data).map(function (key) {
-      var value = Array.isArray(data[key]) ? data[key].join(' ') : data[key];
+      var value = data[key];
+      if (Array.isArray(value)) {
+        value = value.map(function (v) { return typeof v === 'object' && v !== null ? JSON.stringify(v) : v; }).join(' ');
+      } else if (typeof value === 'object' && value !== null) {
+        value = JSON.stringify(value);
+      }
       return key === 'non_field_errors' ? value : key + ': ' + value;
     }).join(' | ');
   }

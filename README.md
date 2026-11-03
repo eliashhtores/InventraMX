@@ -31,7 +31,9 @@ docker compose up --build
 Open http://localhost:8000. Migrations are applied automatically when the `web` container starts.
 
 The `frontend/` directory is bind-mounted into the container, so edits to HTML/CSS/JS are visible
-after a browser refresh.
+after a browser refresh. This relies on WhiteNoise autorefresh, which is only enabled when
+`DJANGO_DEBUG=1`; with `DJANGO_DEBUG=0`, files are indexed once at startup, so restart the `web`
+container (`docker compose restart web`) after changing the frontend.
 
 ### Configuration
 
@@ -44,15 +46,19 @@ after a browser refresh.
 | `POSTGRES_USER`          | `inventramx`                    | Database user.                               |
 | `POSTGRES_PASSWORD`      | `inventramx`                    | Database password.                           |
 | `POSTGRES_HOST` / `PORT` | `db` / `5432`                   | Database host/port (set by Compose).         |
-| `WEB_PORT`               | `8000`                          | Host port published for the web service.     |
+| `WEB_PORT`               | `8000`                          | Host port published on `127.0.0.1`.          |
 
-> **Note:** the API currently has no authentication and is intended for local/trusted use.
+> **Note:** the API currently has no authentication and is intended for local/trusted use. For that
+> reason Compose publishes the web port on the loopback interface (`127.0.0.1`) only.
 
 ## Tests
 
 ```bash
 docker compose exec web python manage.py test
 ```
+
+CI (`.github/workflows/ci.yml`) runs the same test suite against a PostgreSQL service on every push
+and pull request.
 
 ## REST API
 
@@ -69,6 +75,9 @@ All endpoints are under `/api/` and return JSON. List endpoints are paginated
 | `/api/reports/summary/`    | GET                          | Totals, movement counts, low-stock products |
 | `/api/health/`             | GET                          | Liveness + database check                   |
 
+Unknown values for choice filters (`location_type`, `movement_type`) or non-numeric ids return
+`400 Bad Request`.
+
 Deleting a warehouse, location or product that is referenced elsewhere returns `409 Conflict`;
 deactivate it (`PATCH {"is_active": false}`) instead.
 
@@ -83,6 +92,11 @@ if it would make stock negative. `quantity` is always a positive integer.
 | `outbound`      | required        | —             | Pick / ship stock              |
 | `transfer`      | required        | required      | Move stock between locations   |
 | `adjustment`    | one of the two  | one of the two| Increase (to) or decrease (from) |
+
+Transfers may move stock between locations in **different warehouses**; this is intentional.
+
+A product is reported as **low stock** when its `reorder_level` is greater than `0` and its total
+quantity on hand is at or below that level. `reorder_level = 0` disables the alert for the product.
 
 ```bash
 curl -X POST localhost:8000/api/movements/ -H 'Content-Type: application/json' \

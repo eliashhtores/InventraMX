@@ -3,7 +3,9 @@
   'use strict';
 
   var VIEWS = ['dashboard', 'products', 'warehouses', 'locations', 'stock', 'movements'];
+  var PAGE_SIZE = 50;
   var cache = { warehouses: [], locations: [], products: [] };
+  var offsets = {};
 
   // ---------- DOM helpers ----------
 
@@ -73,6 +75,66 @@
 
   function results(page) { return page && page.results ? page.results : (page || []); }
 
+  // ---------- Pagination ----------
+
+  /** Fetch one page of a list endpoint for a view, using that view's current offset. */
+  function fetchPage(view, path, params) {
+    params = params || {};
+    params.limit = PAGE_SIZE;
+    params.offset = offsets[view] || 0;
+    return Api.get(path, params).then(function (page) {
+      // If records were removed and the current page is now past the end, step back.
+      if (!page.results.length && params.offset > 0 && page.count > 0) {
+        offsets[view] = Math.max(0, Math.floor((page.count - 1) / PAGE_SIZE) * PAGE_SIZE);
+        return fetchPage(view, path, params);
+      }
+      return page;
+    });
+  }
+
+  /** Fetch every page of a list endpoint (used for dropdown lookups). */
+  function fetchAll(path, params, acc) {
+    acc = acc || [];
+    var query = Object.assign({}, params, { limit: 1000, offset: acc.length });
+    return Api.get(path, query).then(function (page) {
+      acc = acc.concat(page.results);
+      return page.next && page.results.length ? fetchAll(path, params, acc) : acc;
+    });
+  }
+
+  function resetPage(view) { offsets[view] = 0; }
+
+  /** Render "Showing a–b of n" with Previous/Next buttons below the table that owns tbody. */
+  function renderPager(tbody, view, page) {
+    var table = tbody.closest('table');
+    var pager = table.nextElementSibling;
+    if (!pager || !pager.classList.contains('pager')) {
+      pager = el('div', { className: 'pager' });
+      table.parentNode.insertBefore(pager, table.nextSibling);
+    }
+    var offset = offsets[view] || 0;
+    var shown = page.results.length;
+    var summary = page.count ? 'Showing ' + (offset + 1) + '–' + (offset + shown) + ' of ' + page.count : '';
+    function go(delta) {
+      return function () {
+        offsets[view] = Math.max(0, offset + delta);
+        loadCurrent();
+      };
+    }
+    var prev = el('button', { type: 'button', className: 'btn-link', text: '‹ Previous', onclick: go(-PAGE_SIZE) });
+    var next = el('button', { type: 'button', className: 'btn-link', text: 'Next ›', onclick: go(PAGE_SIZE) });
+    prev.disabled = !page.previous;
+    next.disabled = !page.next;
+    pager.replaceChildren(el('span', { text: summary }), el('span', { className: 'space-x-3' }, [prev, next]));
+    pager.classList.toggle('hidden', !page.count);
+  }
+
+  /** Render a page of results into tbody plus its pager. */
+  function renderPage(tbody, view, page, rowFn, emptyText) {
+    renderRows(tbody, results(page), rowFn, emptyText);
+    renderPager(tbody, view, page);
+  }
+
   // ---------- Lookups (warehouses / locations / products dropdowns) ----------
 
   var LABELS = {
@@ -83,13 +145,13 @@
 
   function refreshLookups() {
     return Promise.all([
-      Api.get('/warehouses/', { limit: 1000 }),
-      Api.get('/locations/', { limit: 1000, is_active: 'true' }),
-      Api.get('/products/', { limit: 1000, is_active: 'true' })
-    ]).then(function (pages) {
-      cache.warehouses = results(pages[0]);
-      cache.locations = results(pages[1]);
-      cache.products = results(pages[2]);
+      fetchAll('/warehouses/'),
+      fetchAll('/locations/', { is_active: 'true' }),
+      fetchAll('/products/', { is_active: 'true' })
+    ]).then(function (lists) {
+      cache.warehouses = lists[0];
+      cache.locations = lists[1];
+      cache.products = lists[2];
       $all('select[data-options]').forEach(fillSelect);
     });
   }
@@ -161,9 +223,10 @@
   }
 
   function loadProducts() {
-    return Api.get('/products/', { search: $('#product-search').value }).then(function (page) {
-      renderRows($('#products-body'), results(page), function (p) {
-        var low = p.is_active && p.total_quantity <= p.reorder_level;
+    return fetchPage('products', '/products/', { search: $('#product-search').value }).then(function (page) {
+      renderPage($('#products-body'), 'products', page, function (p) {
+        // reorder_level 0 means "no reorder alert" (matches the backend low-stock report).
+        var low = p.is_active && p.reorder_level > 0 && p.total_quantity <= p.reorder_level;
         return el('tr', {}, [
           td(p.sku, 'font-mono'), td(p.name), td(p.unit),
           td(p.total_quantity, 'text-right' + (low ? ' text-red-600 font-medium' : '')),
@@ -175,32 +238,32 @@
   }
 
   function loadWarehouses() {
-    return Api.get('/warehouses/').then(function (page) {
-      renderRows($('#warehouses-body'), results(page), function (w) {
+    return fetchPage('warehouses', '/warehouses/').then(function (page) {
+      renderPage($('#warehouses-body'), 'warehouses', page, function (w) {
         return el('tr', {}, [td(w.code, 'font-mono'), td(w.name), td(w.address), td(w.is_active ? 'Yes' : 'No'), actionCell('/warehouses/', w, w.code)]);
       }, 'No warehouses yet.');
     });
   }
 
   function loadLocations() {
-    return Api.get('/locations/', { warehouse: $('#location-filter').value }).then(function (page) {
-      renderRows($('#locations-body'), results(page), function (l) {
+    return fetchPage('locations', '/locations/', { warehouse: $('#location-filter').value }).then(function (page) {
+      renderPage($('#locations-body'), 'locations', page, function (l) {
         return el('tr', {}, [td(l.warehouse_code), td(l.code, 'font-mono'), td(l.location_type), td(l.is_active ? 'Yes' : 'No'), actionCell('/locations/', l, l.code)]);
       }, 'No locations yet.');
     });
   }
 
   function loadStock() {
-    return Api.get('/stock/', { warehouse: $('#stock-warehouse').value, search: $('#stock-search').value }).then(function (page) {
-      renderRows($('#stock-body'), results(page), function (s) {
+    return fetchPage('stock', '/stock/', { warehouse: $('#stock-warehouse').value, search: $('#stock-search').value }).then(function (page) {
+      renderPage($('#stock-body'), 'stock', page, function (s) {
         return el('tr', {}, [td(s.product_sku, 'font-mono'), td(s.product_name), td(s.warehouse_code), td(s.location_code), td(s.quantity, 'text-right font-medium'), td(formatDate(s.updated_at))]);
       }, 'No stock on hand.');
     });
   }
 
   function loadMovements() {
-    return Api.get('/movements/', { movement_type: $('#movement-filter').value }).then(function (page) {
-      renderRows($('#movements-body'), results(page), function (m) {
+    return fetchPage('movements', '/movements/', { movement_type: $('#movement-filter').value }).then(function (page) {
+      renderPage($('#movements-body'), 'movements', page, function (m) {
         return el('tr', {}, [
           td(formatDate(m.created_at)),
           el('td', {}, [el('span', { className: 'badge badge-' + m.movement_type, text: m.movement_type })]),
@@ -281,11 +344,12 @@
     bindCreateForm('#movement-form', '/movements/', 'Movement recorded.');
 
     $('#movement-type').addEventListener('change', updateMovementForm);
-    $('#product-search').addEventListener('input', debounce(loadCurrent, 300));
-    $('#stock-search').addEventListener('input', debounce(loadCurrent, 300));
-    $('#stock-warehouse').addEventListener('change', loadCurrent);
-    $('#location-filter').addEventListener('change', loadCurrent);
-    $('#movement-filter').addEventListener('change', loadCurrent);
+    function filterChanged(view) { return function () { resetPage(view); loadCurrent(); }; }
+    $('#product-search').addEventListener('input', debounce(filterChanged('products'), 300));
+    $('#stock-search').addEventListener('input', debounce(filterChanged('stock'), 300));
+    $('#stock-warehouse').addEventListener('change', filterChanged('stock'));
+    $('#location-filter').addEventListener('change', filterChanged('locations'));
+    $('#movement-filter').addEventListener('change', filterChanged('movements'));
     window.addEventListener('hashchange', showView);
 
     updateMovementForm();
