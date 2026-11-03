@@ -33,11 +33,9 @@ if not SECRET_KEY:
     SECRET_KEY = "insecure-development-key-change-me"
 
 ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1")
-CSRF_TRUSTED_ORIGINS = env_list("DJANGO_CSRF_TRUSTED_ORIGINS")
 
+# django.contrib.auth/contenttypes are intentionally omitted until authentication is added.
 INSTALLED_APPS = [
-    "django.contrib.auth",
-    "django.contrib.contenttypes",
     "django.contrib.staticfiles",
     "rest_framework",
     "inventory",

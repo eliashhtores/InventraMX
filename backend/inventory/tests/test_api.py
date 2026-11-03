@@ -1,3 +1,6 @@
+from unittest import mock
+
+from django.db import OperationalError
 from django.test import TestCase
 from rest_framework.test import APIClient
 
@@ -43,6 +46,12 @@ class CrudTests(ApiTestCase):
         response = self.client.get(f"/api/locations/?warehouse={other.id}")
         self.assertEqual([loc["code"] for loc in response.json()["results"]], ["B-01"])
         self.assertEqual(self.client.get("/api/locations/?warehouse=abc").status_code, 400)
+
+    def test_invalid_choice_filters_rejected(self):
+        self.assertEqual(self.client.get("/api/locations/?location_type=xyz").status_code, 400)
+        self.assertEqual(self.client.get("/api/movements/?movement_type=xyz").status_code, 400)
+        self.assertEqual(self.client.get("/api/locations/?location_type=receiving").json()["count"], 1)
+        self.assertEqual(self.client.get("/api/movements/?movement_type=inbound").status_code, 200)
 
     def test_delete_referenced_warehouse_returns_conflict(self):
         response = self.client.delete(f"/api/warehouses/{self.warehouse.id}/")
@@ -118,8 +127,19 @@ class ReportTests(ApiTestCase):
         self.assertEqual(data["movements"]["inbound"], 1)
         self.assertEqual([p["sku"] for p in data["low_stock"]], ["SKU-1"])
 
+    def test_low_stock_ignores_products_without_reorder_level(self):
+        Product.objects.create(sku="SKU-0", name="No alert", reorder_level=0)
+        data = self.client.get("/api/reports/summary/").json()
+        self.assertEqual([p["sku"] for p in data["low_stock"]], ["SKU-1"])
+
     def test_health(self):
         self.assertEqual(self.client.get("/api/health/").json(), {"status": "ok"})
+
+    def test_health_reports_unavailable_database(self):
+        with mock.patch("inventory.views.connection.cursor", side_effect=OperationalError("down")):
+            response = self.client.get("/api/health/")
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response.json(), {"status": "unavailable"})
 
     def test_api_returns_json_only(self):
         response = self.client.get("/api/products/", HTTP_ACCEPT="text/html")

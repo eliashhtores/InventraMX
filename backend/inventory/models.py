@@ -102,6 +102,10 @@ class StockMovement(models.Model):
 
     class Meta:
         ordering = ["-created_at", "-id"]
+        indexes = [
+            models.Index(fields=["-created_at", "-id"], name="movement_created_idx"),
+            models.Index(fields=["movement_type", "-created_at"], name="movement_type_created_idx"),
+        ]
 
     def __str__(self):
         return f"{self.get_movement_type_display()} {self.product.sku} x{self.quantity}"

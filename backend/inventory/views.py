@@ -1,7 +1,7 @@
-from django.db import connection
+from django.db import DatabaseError, connection
 from django.db.models import Count, F, Q, Sum, Value
 from django.db.models.functions import Coalesce
-from rest_framework import filters, mixins, viewsets
+from rest_framework import filters, mixins, status, viewsets
 from rest_framework.decorators import api_view
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
@@ -16,13 +16,19 @@ from .serializers import (
 )
 
 
-def _query_param_filter(queryset, request, mapping):
-    """Apply simple equality filters from query params, e.g. ?warehouse=1."""
+def _query_param_filter(queryset, request, mapping, choices=None):
+    """Apply simple equality filters from query params, e.g. ?warehouse=1.
+
+    ``choices`` maps a param to its allowed values; unknown values are rejected with 400.
+    """
+    choices = choices or {}
     for param, lookup in mapping.items():
         value = request.query_params.get(param)
         if value not in (None, ""):
             if lookup.endswith("_id") and not value.isdigit():
                 raise ValidationError({param: "Must be a numeric id."})
+            if param in choices and value not in choices[param]:
+                raise ValidationError({param: f"Must be one of: {', '.join(choices[param])}."})
             if lookup.endswith("is_active"):
                 value = value.lower() in {"1", "true", "yes"}
             queryset = queryset.filter(**{lookup: value})
@@ -47,6 +53,7 @@ class LocationViewSet(viewsets.ModelViewSet):
             queryset,
             self.request,
             {"warehouse": "warehouse_id", "location_type": "location_type", "is_active": "is_active"},
+            choices={"location_type": Location.Type.values},
         )
 
 
@@ -91,7 +98,10 @@ class StockMovementViewSet(
             "product", "from_location__warehouse", "to_location__warehouse"
         )
         return _query_param_filter(
-            queryset, self.request, {"movement_type": "movement_type", "product": "product_id"}
+            queryset,
+            self.request,
+            {"movement_type": "movement_type", "product": "product_id"},
+            choices={"movement_type": StockMovement.Type.values},
         )
 
 
@@ -100,7 +110,10 @@ def summary_report(request):
     products = Product.objects.filter(is_active=True).annotate(
         total_quantity=Coalesce(Sum("stock_items__quantity"), Value(0))
     )
-    low_stock = products.filter(total_quantity__lte=F("reorder_level")).order_by("total_quantity", "sku")
+    # reorder_level=0 means "no reorder alert" for the product.
+    low_stock = products.filter(reorder_level__gt=0, total_quantity__lte=F("reorder_level")).order_by(
+        "total_quantity", "sku"
+    )
     movement_counts = StockMovement.objects.aggregate(
         **{t.value: Count("id", filter=Q(movement_type=t.value)) for t in StockMovement.Type}
     )
@@ -127,6 +140,9 @@ def summary_report(request):
 
 @api_view(["GET"])
 def health(request):
-    with connection.cursor() as cursor:
-        cursor.execute("SELECT 1")
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT 1")
+    except DatabaseError:
+        return Response({"status": "unavailable"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
     return Response({"status": "ok"})
