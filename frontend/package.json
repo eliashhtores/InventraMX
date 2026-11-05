@@ -1,0 +1,11 @@
+{
+  "name": "inventramx-frontend",
+  "private": true,
+  "scripts": {
+    "build": "tailwindcss -c tailwind.config.js -i tailwind.css -o css/tailwind.css --minify",
+    "watch": "tailwindcss -c tailwind.config.js -i tailwind.css -o css/tailwind.css --watch"
+  },
+  "devDependencies": {
+    "tailwindcss": "3.4.17"
+  }
+}

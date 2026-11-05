@@ -33,8 +33,10 @@ services:
       # Bound to loopback: the API is unauthenticated and intended for local use only.
       - "127.0.0.1:${WEB_PORT:-8000}:8000"
     volumes:
-      # Live-edit the static frontend without rebuilding the image.
-      - ./frontend:/app/frontend:ro
+      # Preserve compiled Tailwind from the image while live-editing frontend sources.
+      - ./frontend/index.html:/app/frontend/index.html:ro
+      - ./frontend/js:/app/frontend/js:ro
+      - ./frontend/css/styles.css:/app/frontend/css/styles.css:ro
 
 volumes:
   postgres_data:

@@ -4,3 +4,6 @@ __pycache__/
 venv/
 .env
 backend/staticfiles/
+.vscode/
+frontend/node_modules/
+frontend/css/tailwind.css

@@ -1,165 +1,366 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>InventraMX · WMS</title>
-  <link rel="icon" href="data:,">
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="stylesheet" href="css/styles.css">
-</head>
-<body class="bg-slate-100 text-slate-800 min-h-screen">
-  <header class="bg-slate-900 text-white">
-    <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center gap-4">
-      <h1 class="text-xl font-semibold">Inventra<span class="text-emerald-400">MX</span></h1>
-      <nav id="nav" class="flex flex-wrap gap-1 text-sm">
-        <a href="#dashboard" data-view="dashboard" class="nav-link">Dashboard</a>
-        <a href="#products" data-view="products" class="nav-link">Products</a>
-        <a href="#warehouses" data-view="warehouses" class="nav-link">Warehouses</a>
-        <a href="#locations" data-view="locations" class="nav-link">Locations</a>
-        <a href="#stock" data-view="stock" class="nav-link">Stock</a>
-        <a href="#movements" data-view="movements" class="nav-link">Movements</a>
-      </nav>
-      <span id="api-status" class="ml-auto text-xs text-slate-400">API: checking…</span>
-    </div>
-  </header>
+<!doctype html>
+<html lang="es">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>InventraMX</title>
+        <link rel="icon" href="data:," />
+        <link rel="stylesheet" href="css/tailwind.css" />
+        <link rel="stylesheet" href="css/styles.css" />
+    </head>
+    <body class="bg-slate-100 text-slate-800 min-h-screen">
+        <header class="bg-slate-900 text-white">
+            <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center gap-4">
+                <h1 class="text-xl font-semibold">Inventra<span class="text-emerald-400">MX</span></h1>
+                <nav id="nav" class="flex flex-wrap gap-1 text-sm">
+                    <a href="#dashboard" data-view="dashboard" class="nav-link">Panel</a>
+                    <a href="#products" data-view="products" class="nav-link">Productos</a>
+                    <a href="#lots" data-view="lots" class="nav-link">Números de lote</a>
+                    <a href="#warehouses" data-view="warehouses" class="nav-link">Almacenes</a>
+                    <a href="#locations" data-view="locations" class="nav-link">Ubicaciones</a>
+                    <a href="#stock" data-view="stock" class="nav-link">Inventario</a>
+                    <a href="#movements" data-view="movements" class="nav-link">Movimientos</a>
+                    <a href="#reservations" data-view="reservations" class="nav-link">Reservas</a>
+                </nav>
+                <span id="api-status" class="ml-auto text-xs text-slate-400">API: comprobando…</span>
+            </div>
+        </header>
 
-  <div id="toast" aria-hidden="true" class="hidden fixed top-4 right-4 z-50 px-4 py-2 rounded shadow text-sm text-white"></div>
-  <div id="sr-status" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
-  <div id="sr-alert" class="sr-only" role="alert" aria-live="assertive" aria-atomic="true"></div>
+        <div id="toast" aria-hidden="true" class="hidden fixed top-4 right-4 z-50 px-4 py-2 rounded shadow text-sm text-white"></div>
+        <div id="sr-status" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
+        <div id="sr-alert" class="sr-only" role="alert" aria-live="assertive" aria-atomic="true"></div>
 
-  <main class="max-w-7xl mx-auto px-4 py-6 space-y-6">
-    <!-- Dashboard -->
-    <section id="view-dashboard" class="view">
-      <div id="summary-cards" class="grid grid-cols-2 md:grid-cols-4 gap-4"></div>
-      <div class="grid md:grid-cols-2 gap-6 mt-6">
-        <div class="card">
-          <h2 class="card-title">Movements by type</h2>
-          <ul id="summary-movements" class="text-sm space-y-1"></ul>
-        </div>
-        <div class="card">
-          <h2 class="card-title">Low stock (at or below reorder level)</h2>
-          <table class="table"><thead><tr><th>SKU</th><th>Name</th><th class="text-right">On hand</th><th class="text-right">Reorder</th></tr></thead>
-            <tbody id="low-stock-body"></tbody></table>
-        </div>
-      </div>
-    </section>
+        <main class="max-w-7xl mx-auto px-4 py-6 space-y-6">
+            <!-- Dashboard -->
+            <section id="view-dashboard" class="view">
+                <div id="summary-cards" class="grid grid-cols-2 md:grid-cols-4 gap-4"></div>
+                <div class="grid md:grid-cols-2 gap-6 mt-6">
+                    <div class="card">
+                        <h2 class="card-title">Movimientos por tipo</h2>
+                        <ul id="summary-movements" class="text-sm space-y-1"></ul>
+                    </div>
+                    <div class="card">
+                        <h2 class="card-title">Poco inventario global (en el nivel de reposición o por debajo)</h2>
+                        <p id="low-stock-summary" class="text-sm text-slate-500 mb-3"></p>
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>SKU</th>
+                                    <th>Nombre</th>
+                                    <th class="text-right">Existencias</th>
+                                    <th class="text-right">Nivel de reposición</th>
+                                </tr>
+                            </thead>
+                            <tbody id="low-stock-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="card mt-6">
+                    <h2 class="card-title">Inventario y alertas por almacén</h2>
+                    <p class="text-sm text-slate-500 mb-3">
+                        Cada producto activo usa su nivel de reposición en todos los almacenes; sin existencias cuenta como cero. Las alertas usan
+                        existencias físicas, no disponibilidad.
+                    </p>
+                    <div id="warehouse-summary" class="space-y-4"></div>
+                </div>
+            </section>
 
-    <!-- Products -->
-    <section id="view-products" class="view hidden">
-      <form id="product-form" class="card grid md:grid-cols-6 gap-3 items-end">
-        <h2 class="card-title md:col-span-6">New product</h2>
-        <label class="field">SKU<input name="sku" required maxlength="64"></label>
-        <label class="field md:col-span-2">Name<input name="name" required maxlength="200"></label>
-        <label class="field">Unit<input name="unit" value="pcs" maxlength="20"></label>
-        <label class="field">Reorder level<input name="reorder_level" type="number" min="0" value="0"></label>
-        <button class="btn">Add product</button>
-      </form>
-      <div class="card mt-6">
-        <div class="flex items-center justify-between mb-3">
-          <h2 class="card-title mb-0">Products</h2>
-          <input id="product-search" type="search" placeholder="Search SKU or name…" class="input w-64">
-        </div>
-        <table class="table"><thead><tr><th>SKU</th><th>Name</th><th>Unit</th><th class="text-right">On hand</th><th class="text-right">Reorder</th><th>Active</th><th></th></tr></thead>
-          <tbody id="products-body"></tbody></table>
-      </div>
-    </section>
+            <!-- Products -->
+            <section id="view-products" class="view hidden">
+                <form id="product-form" class="card grid md:grid-cols-6 gap-3 items-end">
+                    <h2 class="card-title md:col-span-6">Nuevo producto</h2>
+                    <label class="field">SKU<input name="sku" required maxlength="64" /></label>
+                    <label class="field">Código de barras<input name="barcode" maxlength="100" /></label>
+                    <label class="field"
+                        >Control por lote<select name="lot_tracked" data-type="boolean">
+                            <option value="true">Sí</option>
+                            <option value="false" selected>No</option>
+                        </select></label
+                    >
+                    <label class="field md:col-span-2">Nombre<input name="name" required maxlength="200" /></label>
+                    <label class="field">Unidad<input name="unit" value="pz" maxlength="20" /></label>
+                    <label class="field">Nivel de reposición<input name="reorder_level" type="number" min="0" value="0" /></label>
+                    <label class="field md:col-span-3">Descripción<textarea name="description" rows="2"></textarea></label>
+                    <button class="btn">Agregar producto</button>
+                    <button type="button" class="btn-link hidden" data-cancel-edit>Cancelar edición</button>
+                </form>
+                <div class="card mt-6">
+                    <div class="flex items-center justify-between mb-3">
+                        <h2 class="card-title mb-0">Productos</h2>
+                        <input id="product-search" type="search" placeholder="Buscar por SKU o nombre…" class="input w-64" />
+                    </div>
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>SKU</th>
+                                <th>Código de barras</th>
+                                <th>Control por lote</th>
+                                <th>Nombre</th>
+                                <th>Unidad</th>
+                                <th class="text-right">Existencias</th>
+                                <th class="text-right">Reservadas</th>
+                                <th class="text-right">Disponibles</th>
+                                <th class="text-right">Reposición</th>
+                                <th>Activo</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="products-body"></tbody>
+                    </table>
+                </div>
+            </section>
 
-    <!-- Warehouses -->
-    <section id="view-warehouses" class="view hidden">
-      <form id="warehouse-form" class="card grid md:grid-cols-5 gap-3 items-end">
-        <h2 class="card-title md:col-span-5">New warehouse</h2>
-        <label class="field">Code<input name="code" required maxlength="20"></label>
-        <label class="field">Name<input name="name" required maxlength="120"></label>
-        <label class="field md:col-span-2">Address<input name="address" maxlength="255"></label>
-        <button class="btn">Add warehouse</button>
-      </form>
-      <div class="card mt-6">
-        <h2 class="card-title">Warehouses</h2>
-        <table class="table"><thead><tr><th>Code</th><th>Name</th><th>Address</th><th>Active</th><th></th></tr></thead>
-          <tbody id="warehouses-body"></tbody></table>
-      </div>
-    </section>
+            <!-- Lots -->
+            <section id="view-lots" class="view hidden">
+                <form id="lot-form" class="card grid md:grid-cols-4 gap-3 items-end">
+                    <h2 class="card-title md:col-span-4">Nuevo número de lote</h2>
+                    <label class="field">Producto<select name="product" required data-options="trackedProducts"></select></label>
+                    <label class="field">Número de lote<input name="lot_number" maxlength="100" required /></label>
+                    <label class="field">Caducidad<input name="expiry_date" type="date" required /></label>
+                    <button class="btn">Crear número de lote</button>
+                    <button type="button" class="btn-link hidden" data-cancel-edit>Cancelar edición</button>
+                    <p class="text-xs text-slate-500 md:col-span-4">
+                        La caducidad es opcional. Un número de lote usado en inventario o movimientos no se puede modificar.
+                    </p>
+                </form>
+                <div class="card mt-6">
+                    <h2 class="card-title">Números de lote</h2>
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>SKU</th>
+                                <th>Número de lote</th>
+                                <th>Caducidad</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="lots-body"></tbody>
+                    </table>
+                </div>
+            </section>
 
-    <!-- Locations -->
-    <section id="view-locations" class="view hidden">
-      <form id="location-form" class="card grid md:grid-cols-4 gap-3 items-end">
-        <h2 class="card-title md:col-span-4">New location</h2>
-        <label class="field">Warehouse<select name="warehouse" required data-options="activeWarehouses"></select></label>
-        <label class="field">Code<input name="code" required maxlength="40" placeholder="A-01-01"></label>
-        <label class="field">Type
-          <select name="location_type">
-            <option value="storage">Storage</option>
-            <option value="receiving">Receiving</option>
-            <option value="picking">Picking</option>
-            <option value="shipping">Shipping</option>
-          </select>
-        </label>
-        <button class="btn">Add location</button>
-      </form>
-      <div class="card mt-6">
-        <div class="flex items-center justify-between mb-3">
-          <h2 class="card-title mb-0">Locations</h2>
-          <select id="location-filter" class="input w-64" data-options="warehouses" data-empty="All warehouses"></select>
-        </div>
-        <table class="table"><thead><tr><th>Warehouse</th><th>Code</th><th>Type</th><th>Active</th><th></th></tr></thead>
-          <tbody id="locations-body"></tbody></table>
-      </div>
-    </section>
+            <!-- Warehouses -->
+            <section id="view-warehouses" class="view hidden">
+                <form id="warehouse-form" class="card grid md:grid-cols-5 gap-3 items-end">
+                    <h2 class="card-title md:col-span-5">Nuevo almacén</h2>
+                    <label class="field">Código<input name="code" required maxlength="20" /></label>
+                    <label class="field">Nombre<input name="name" required maxlength="120" /></label>
+                    <label class="field md:col-span-2">Dirección<input name="address" maxlength="255" /></label>
+                    <button class="btn">Agregar almacén</button>
+                    <button type="button" class="btn-link hidden" data-cancel-edit>Cancelar edición</button>
+                </form>
+                <div class="card mt-6">
+                    <h2 class="card-title">Almacenes</h2>
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Código</th>
+                                <th>Nombre</th>
+                                <th>Dirección</th>
+                                <th>Activo</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="warehouses-body"></tbody>
+                    </table>
+                </div>
+            </section>
 
-    <!-- Stock -->
-    <section id="view-stock" class="view hidden">
-      <div class="card">
-        <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
-          <h2 class="card-title mb-0">Stock on hand</h2>
-          <div class="flex gap-2">
-            <select id="stock-warehouse" class="input w-48" data-options="warehouses" data-empty="All warehouses"></select>
-            <input id="stock-search" type="search" placeholder="Search SKU, name, location…" class="input w-64">
-          </div>
-        </div>
-        <table class="table"><thead><tr><th>SKU</th><th>Product</th><th>Warehouse</th><th>Location</th><th class="text-right">Quantity</th><th>Updated</th></tr></thead>
-          <tbody id="stock-body"></tbody></table>
-      </div>
-    </section>
+            <!-- Locations -->
+            <section id="view-locations" class="view hidden">
+                <form id="location-form" class="card grid md:grid-cols-4 gap-3 items-end">
+                    <h2 class="card-title md:col-span-4">Nueva ubicación</h2>
+                    <label class="field">Almacén<select name="warehouse" required data-options="activeWarehouses"></select></label>
+                    <label class="field">Código<input name="code" required maxlength="40" placeholder="A-01-01" /></label>
+                    <label class="field">Código de barras<input name="barcode" maxlength="100" /></label>
+                    <label class="field"
+                        >Tipo
+                        <select name="location_type">
+                            <option value="storage">Almacenamiento</option>
+                            <option value="receiving">Recepción</option>
+                            <option value="picking">Preparación de pedidos</option>
+                            <option value="shipping">Envío</option>
+                        </select>
+                    </label>
+                    <button class="btn">Agregar ubicación</button>
+                    <button type="button" class="btn-link hidden" data-cancel-edit>Cancelar edición</button>
+                </form>
+                <div class="card mt-6">
+                    <div class="flex items-center justify-between mb-3">
+                        <h2 class="card-title mb-0">Ubicaciones</h2>
+                        <select id="location-filter" class="input w-64" data-options="warehouses" data-empty="Todos los almacenes"></select>
+                    </div>
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Almacén</th>
+                                <th>Código</th>
+                                <th>Código de barras</th>
+                                <th>Tipo</th>
+                                <th>Activo</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="locations-body"></tbody>
+                    </table>
+                </div>
+            </section>
 
-    <!-- Movements -->
-    <section id="view-movements" class="view hidden">
-      <form id="movement-form" class="card grid md:grid-cols-6 gap-3 items-end">
-        <h2 class="card-title md:col-span-6">Record movement</h2>
-        <label class="field">Type
-          <select name="movement_type" id="movement-type">
-            <option value="inbound">Inbound (receive)</option>
-            <option value="outbound">Outbound (pick / ship)</option>
-            <option value="transfer">Transfer</option>
-            <option value="adjustment">Adjustment</option>
-          </select>
-        </label>
-        <label class="field">Product<select name="product" required data-options="products"></select></label>
-        <label class="field" data-for="from">From location<select name="from_location" data-options="locations" data-empty="—"></select></label>
-        <label class="field" data-for="to">To location<select name="to_location" data-options="locations" data-empty="—"></select></label>
-        <label class="field">Quantity<input name="quantity" type="number" min="1" value="1" required></label>
-        <label class="field">Reference<input name="reference" maxlength="100" placeholder="PO / SO #"></label>
-        <p id="movement-hint" class="text-xs text-slate-500 md:col-span-5"></p>
-        <button class="btn">Record</button>
-      </form>
-      <div class="card mt-6">
-        <div class="flex items-center justify-between mb-3">
-          <h2 class="card-title mb-0">Movement history</h2>
-          <select id="movement-filter" class="input w-48">
-            <option value="">All types</option>
-            <option value="inbound">Inbound</option>
-            <option value="outbound">Outbound</option>
-            <option value="transfer">Transfer</option>
-            <option value="adjustment">Adjustment</option>
-          </select>
-        </div>
-        <table class="table"><thead><tr><th>Date</th><th>Type</th><th>SKU</th><th>From</th><th>To</th><th class="text-right">Qty</th><th>Reference</th></tr></thead>
-          <tbody id="movements-body"></tbody></table>
-      </div>
-    </section>
-  </main>
+            <!-- Stock -->
+            <section id="view-stock" class="view hidden">
+                <div class="card">
+                    <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+                        <h2 class="card-title mb-0">Existencias y disponibilidad</h2>
+                        <div class="flex flex-wrap gap-2">
+                            <select id="stock-warehouse" class="input w-48" data-options="warehouses" data-empty="Todos los almacenes"></select>
+                            <input id="stock-search" type="search" placeholder="Buscar por SKU, nombre o ubicación…" class="input w-64" />
+                            <button id="stock-export" type="button" class="btn">Exportar CSV</button>
+                        </div>
+                    </div>
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>SKU</th>
+                                <th>Producto</th>
+                                <th>Almacén</th>
+                                <th>Ubicación</th>
+                                <th>Número de lote</th>
+                                <th>Caducidad</th>
+                                <th class="text-right">Existencias</th>
+                                <th class="text-right">Reservadas</th>
+                                <th class="text-right">Disponibles</th>
+                                <th>Actualizado</th>
+                            </tr>
+                        </thead>
+                        <tbody id="stock-body"></tbody>
+                    </table>
+                </div>
+            </section>
 
-  <script src="js/api.js"></script>
-  <script src="js/app.js"></script>
-</body>
+            <section id="view-reservations" class="view hidden">
+                <form id="reservation-form" class="card grid md:grid-cols-4 gap-3 items-end">
+                    <h2 class="card-title md:col-span-4">Reservar existencias</h2>
+                    <label class="field">Producto y ubicación<select name="stock_item" required data-options="reservableStock"></select></label>
+                    <label class="field">Cantidad<input name="quantity" type="number" min="1" value="1" required /></label>
+                    <label class="field">Pedido / referencia<input name="reference" maxlength="100" required /></label>
+                    <button class="btn">Reservar</button>
+                </form>
+                <div class="card mt-6">
+                    <div class="flex items-center justify-between mb-3">
+                        <h2 class="card-title mb-0">Reservas</h2>
+                        <label class="field"
+                            >Estado
+                            <select id="reservation-filter">
+                                <option value="active">Activas</option>
+                                <option value="">Todas</option>
+                                <option value="released">Liberadas</option>
+                                <option value="fulfilled">Surtidas</option>
+                            </select>
+                        </label>
+                    </div>
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Referencia</th>
+                                <th>SKU</th>
+                                <th>Ubicación</th>
+                                <th>Número de lote</th>
+                                <th>Caducidad</th>
+                                <th class="text-right">Cantidad</th>
+                                <th>Estado</th>
+                                <th>Movimiento de salida</th>
+                                <th>Creada</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="reservations-body"></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Movements -->
+            <section id="view-movements" class="view hidden">
+                <form id="movement-form" class="card grid md:grid-cols-6 gap-3 items-end">
+                    <h2 class="card-title md:col-span-6">Registrar movimiento</h2>
+                    <label class="field"
+                        >Tipo
+                        <select name="movement_type" id="movement-type">
+                            <option value="inbound">Entrada (recibir)</option>
+                            <option value="outbound">Salida (preparar / enviar)</option>
+                            <option value="transfer">Transferencia</option>
+                            <option value="adjustment">Ajuste</option>
+                        </select>
+                    </label>
+                    <label class="field">Producto<select name="product" required data-options="products"></select></label>
+                    <label class="field hidden" id="movement-lot-field">Número de lote<select name="lot" id="movement-lot" data-options="lots" disabled></select></label>
+                    <label class="field" data-for="from"
+                        >Desde la ubicación<select name="from_location" data-options="locations" data-empty="—"></select
+                    ></label>
+                    <label class="field" data-for="to"
+                        >Hacia la ubicación<select name="to_location" data-options="locations" data-empty="—"></select
+                    ></label>
+                    <label class="field">Cantidad<input name="quantity" type="number" min="1" value="1" required /></label>
+                    <label class="field">Referencia<input name="reference" maxlength="100" placeholder="OC / OV n.º" /></label>
+                    <label class="field md:col-span-2"
+                        >Fecha del movimiento (hora local)
+                        <input name="occurred_at" type="datetime-local" aria-describedby="occurred-at-hint" />
+                        <span id="occurred-at-hint" class="text-xs text-slate-500">Opcional; en blanco usa la hora actual.</span>
+                    </label>
+                    <p id="movement-hint" class="text-xs text-slate-500 md:col-span-5"></p>
+                    <button class="btn">Registrar</button>
+                </form>
+                <div class="card mt-6">
+                    <div class="flex flex-wrap items-end justify-between gap-3 mb-3">
+                        <h2 class="card-title mb-0">Historial de movimientos</h2>
+                        <div class="flex flex-wrap items-end gap-3">
+                            <label class="field"
+                                >Tipo
+                                <select id="movement-filter">
+                                    <option value="">Todos los tipos</option>
+                                    <option value="inbound">Entrada</option>
+                                    <option value="outbound">Salida</option>
+                                    <option value="transfer">Transferencia</option>
+                                    <option value="adjustment">Ajuste</option>
+                                </select>
+                            </label>
+                            <label class="field"
+                                >SKU o referencia
+                                <input id="movement-search" type="search" />
+                            </label>
+                            <label class="field"
+                                >Desde (fecha del movimiento)
+                                <input id="movement-date-from" type="date" />
+                            </label>
+                            <label class="field"
+                                >Hasta
+                                <input id="movement-date-to" type="date" />
+                            </label>
+                            <button id="movement-export" type="button" class="btn">Exportar CSV</button>
+                        </div>
+                    </div>
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Fecha del movimiento</th>
+                                <th>Registrado</th>
+                                <th>Tipo</th>
+                                <th>SKU</th>
+                                <th>Número de lote</th>
+                                <th>Caducidad</th>
+                                <th>Desde</th>
+                                <th>Hacia</th>
+                                <th class="text-right">Cantidad</th>
+                                <th>Referencia</th>
+                            </tr>
+                        </thead>
+                        <tbody id="movements-body"></tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+
+        <script src="js/api.js"></script>
+        <script src="js/combobox.js"></script>
+        <script src="js/app.js"></script>
+    </body>
 </html>

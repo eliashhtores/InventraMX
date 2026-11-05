@@ -3,3 +3,5 @@
 **/__pycache__
 **/*.pyc
 backend/staticfiles
+**/node_modules
+frontend/css/tailwind.css
